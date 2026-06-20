@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🍺 Micheladas POS</title>
+<title>🧙 La Taberna de los Muggles</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -243,9 +243,9 @@
 <header>
   <div>
     <div style="display:flex;align-items:center;gap:8px;">
-      <span style="font-size:1.6rem">🍺</span>
+      <span style="font-size:1.6rem">🧙</span>
       <div>
-        <h1>MICHELADAS POS</h1>
+        <h1>LA TABERNA DE LOS MUGGLES</h1>
         <div class="subtitle">Punto de Venta</div>
       </div>
     </div>
@@ -291,8 +291,11 @@
     </div>
     <div class="quick-cash" id="quickCash"></div>
     <div class="pedido-total">
-      <div class="row"><span>Efectivo</span><span id="ptEfectivo">$0</span></div>
-      <div class="row"><span>Cambio</span><span class="cambio" id="ptCambio">$0</span></div>
+      <div class="row"><span>Total a cobrar</span><span id="ptEfectivo" style="font-weight:700;color:var(--text)">$0</span></div>
+      <div class="row" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
+        <span style="font-size:1rem;font-weight:700">💰 Cambio</span>
+        <span class="cambio" id="ptCambio" style="font-size:1.2rem;font-weight:800">$0</span>
+      </div>
     </div>
     <button class="btn-cobrar" id="btnCobrar" onclick="cobrar()">✅ COBRAR</button>
     <button class="btn-limpiar" onclick="limpiarPedido()">🗑️ Cancelar pedido</button>
@@ -450,6 +453,18 @@ function changeQty(id, delta) {
   renderCarrito();
 }
 
+function editPrecioItem(id) {
+  const item = state.carrito.find(i => i.id === id);
+  if (!item) return;
+  const precioActual = item.precio;
+  const nuevo = prompt(`Precio unitario de "${item.nombre}"\n(precio base: $${precioActual})`, precioActual);
+  if (nuevo === null) return;
+  const val = parseFloat(nuevo);
+  if (isNaN(val) || val < 0) { alert('Precio inválido'); return; }
+  item.precio = val;
+  renderCarrito();
+}
+
 function getTotal() { return state.carrito.reduce((s, i) => s + i.precio * i.qty, 0); }
 
 function renderCarrito() {
@@ -477,6 +492,7 @@ function renderCarrito() {
         <button class="qty-btn plus" onclick="changeQty(${i.id},1)">+</button>
       </div>
       <span class="item-price">$${(i.precio * i.qty).toFixed(0)}</span>
+      <button onclick="editPrecioItem(${i.id})" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 8px;font-size:.85rem;cursor:pointer" title="Cambiar precio">✏️</button>
     </div>
   `).join('');
 
@@ -506,8 +522,9 @@ function calcCambio() {
   const ef = parseFloat(document.getElementById('efectivoInput').value) || 0;
   const total = getTotal();
   const cambio = ef - total;
-  document.getElementById('ptEfectivo').textContent = '$' + ef;
+  document.getElementById('ptEfectivo').textContent = '$' + total;
   document.getElementById('ptCambio').textContent = cambio >= 0 ? '$' + cambio : '--';
+  document.getElementById('ptCambio').style.color = cambio >= 0 ? 'var(--green)' : 'var(--red)';
   document.getElementById('btnCobrar').disabled = cambio < 0 || state.carrito.length === 0;
 }
 

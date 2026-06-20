@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🍺 Micheladas POS</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --card: #22263a;
+    --accent: #e8a020;
+    --accent2: #c75b2a;
+    --green: #2ecc71;
+    --red: #e74c3c;
+    --text: #f0f0f0;
+    --muted: #8a8fa8;
+    --border: #2e3350;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+
+  /* HEADER */
+  header {
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    padding: 14px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 12px #0008;
+  }
+  header h1 { font-size: 1.3rem; font-weight: 700; letter-spacing: 1px; }
+  header .subtitle { font-size: .75rem; opacity: .85; }
+  .total-global { background: #0004; border-radius: 8px; padding: 6px 14px; text-align: right; }
+  .total-global span { font-size: 1.4rem; font-weight: 800; color: #fff; }
+  .total-global small { display: block; font-size: .7rem; opacity: .8; }
+
+  /* NAV TABS */
+  nav {
+    display: flex; background: var(--surface);
+    border-bottom: 2px solid var(--border);
+    overflow-x: auto;
+  }
+  nav button {
+    flex: 1; min-width: 80px; padding: 12px 8px;
+    background: none; border: none; color: var(--muted);
+    font-size: .8rem; font-weight: 600; cursor: pointer;
+    border-bottom: 3px solid transparent; transition: .2s;
+    white-space: nowrap;
+  }
+  nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
+  nav button:hover { color: var(--text); }
+
+  /* SECTIONS */
+  section { display: none; padding: 16px; }
+  section.active { display: block; }
+
+  /* MENU GRID */
+  .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .menu-card {
+    background: var(--card); border-radius: 12px; padding: 16px 12px;
+    border: 2px solid var(--border); cursor: pointer; text-align: center;
+    transition: .2s; user-select: none;
+  }
+  .menu-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .menu-card:active { transform: scale(.97); }
+  .menu-card .emoji { font-size: 2rem; display: block; margin-bottom: 8px; }
+  .menu-card .name { font-size: .85rem; font-weight: 700; margin-bottom: 4px; }
+  .menu-card .price { font-size: 1.1rem; color: var(--accent); font-weight: 800; }
+  .menu-card .profit { font-size: .7rem; color: var(--green); margin-top: 2px; }
+
+  /* PEDIDO ACTUAL */
+  .pedido-header { display: flex; gap: 10px; margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
+  .pedido-header label { font-size: .8rem; color: var(--muted); }
+  .pedido-header input {
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 8px 12px; font-size: .95rem; width: 120px;
+  }
+  .items-list { margin-bottom: 14px; }
+  .item-row {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--card); border-radius: 8px; padding: 10px 12px;
+    margin-bottom: 8px; border: 1px solid var(--border);
+  }
+  .item-row .item-name { flex: 1; font-size: .9rem; }
+  .item-row .item-price { color: var(--accent); font-weight: 700; min-width: 60px; text-align: right; }
+  .qty-ctrl { display: flex; align-items: center; gap: 6px; }
+  .qty-btn {
+    width: 28px; height: 28px; border-radius: 50%; border: none;
+    font-size: 1.1rem; font-weight: 700; cursor: pointer; line-height: 1;
+  }
+  .qty-btn.minus { background: var(--red); color: #fff; }
+  .qty-btn.plus { background: var(--green); color: #fff; }
+  .qty-num { font-size: 1rem; font-weight: 700; min-width: 20px; text-align: center; }
+
+  .pedido-total {
+    background: var(--surface); border-radius: 10px; padding: 12px 16px;
+    border: 1px solid var(--border); margin-bottom: 14px;
+  }
+  .pedido-total .row { display: flex; justify-content: space-between; padding: 4px 0; }
+  .pedido-total .big { font-size: 1.3rem; font-weight: 800; color: var(--accent); }
+  .pedido-total .cambio { color: var(--green); font-weight: 700; }
+
+  .efectivo-row { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .efectivo-row label { font-size: .85rem; color: var(--muted); }
+  .efectivo-row input {
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 8px 12px; font-size: 1rem; width: 140px;
+  }
+  .quick-cash { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .quick-cash button {
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 6px 12px; font-size: .8rem; cursor: pointer;
+  }
+  .quick-cash button:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-cobrar {
+    width: 100%; padding: 14px; background: linear-gradient(135deg, var(--accent2), var(--accent));
+    color: #fff; border: none; border-radius: 10px; font-size: 1rem; font-weight: 700;
+    cursor: pointer; letter-spacing: 1px; transition: .2s;
+  }
+  .btn-cobrar:hover { opacity: .9; }
+  .btn-cobrar:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-limpiar {
+    width: 100%; padding: 10px; background: none; border: 1px solid var(--border);
+    color: var(--muted); border-radius: 10px; font-size: .85rem; cursor: pointer;
+    margin-top: 8px;
+  }
+  .btn-limpiar:hover { border-color: var(--red); color: var(--red); }
+
+  /* HISTORIAL */
+  .historial-summary {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px;
+    margin-bottom: 16px;
+  }
+  .stat-card {
+    background: var(--card); border-radius: 10px; padding: 12px 14px;
+    border: 1px solid var(--border); text-align: center;
+  }
+  .stat-card .val { font-size: 1.4rem; font-weight: 800; color: var(--accent); }
+  .stat-card .lbl { font-size: .7rem; color: var(--muted); margin-top: 2px; }
+
+  .pedido-card {
+    background: var(--card); border-radius: 10px; padding: 12px 14px;
+    border: 1px solid var(--border); margin-bottom: 10px;
+  }
+  .pedido-card .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .pedido-card .mesa { font-weight: 700; font-size: .95rem; }
+  .pedido-card .hora { font-size: .75rem; color: var(--muted); }
+  .pedido-card .items-summary { font-size: .8rem; color: var(--muted); margin-bottom: 6px; }
+  .pedido-card .bottom { display: flex; justify-content: space-between; align-items: center; }
+  .pedido-card .total-p { font-size: 1.1rem; font-weight: 800; color: var(--accent); }
+  .badge { padding: 3px 10px; border-radius: 20px; font-size: .7rem; font-weight: 700; }
+  .badge.cobrado { background: #1a4a2e; color: var(--green); }
+  .btn-void {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    border-radius: 6px; padding: 4px 10px; font-size: .75rem; cursor: pointer;
+  }
+  .btn-void:hover { border-color: var(--red); color: var(--red); }
+
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .filter-bar input {
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 8px 12px; font-size: .85rem; flex: 1; min-width: 120px;
+  }
+  .btn-export {
+    background: var(--card); border: 1px solid var(--accent); color: var(--accent);
+    border-radius: 8px; padding: 8px 14px; font-size: .8rem; cursor: pointer; font-weight: 600;
+  }
+
+  /* COSTOS */
+  .costos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  .costo-card {
+    background: var(--card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden;
+  }
+  .costo-card .costo-header {
+    padding: 12px 14px; background: linear-gradient(135deg, #1e2235, #2a2f50);
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .costo-card .costo-header .cname { font-weight: 700; font-size: .9rem; }
+  .costo-card .costo-header .cprice { color: var(--accent); font-weight: 800; }
+  .costo-card .costo-body { padding: 12px 14px; }
+  .costo-row { display: flex; justify-content: space-between; font-size: .78rem; padding: 3px 0; border-bottom: 1px solid #ffffff08; }
+  .costo-row:last-child { border: none; }
+  .costo-row .cr-label { color: var(--muted); }
+  .costo-totals { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+  .costo-totals .ctr { display: flex; justify-content: space-between; font-size: .82rem; padding: 2px 0; }
+  .costo-totals .ctr.ganancia { color: var(--green); font-weight: 700; }
+
+  /* CONFIG */
+  .config-section { background: var(--card); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; border: 1px solid var(--border); }
+  .config-section h3 { font-size: .9rem; color: var(--accent); margin-bottom: 12px; }
+  .config-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; flex-wrap: wrap; }
+  .config-row label { font-size: .8rem; color: var(--muted); min-width: 90px; }
+  .config-row input {
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 7px 10px; font-size: .9rem; flex: 1; min-width: 100px;
+  }
+  .btn-save {
+    background: var(--green); color: #fff; border: none; border-radius: 8px;
+    padding: 10px 20px; font-size: .85rem; font-weight: 700; cursor: pointer;
+  }
+  .btn-delete {
+    background: var(--red); color: #fff; border: none; border-radius: 8px;
+    padding: 6px 14px; font-size: .8rem; cursor: pointer; border-radius: 6px;
+  }
+  .producto-edit-row {
+    display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap;
+  }
+  .producto-edit-row input {
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 7px 10px; font-size: .85rem;
+  }
+  .producto-edit-row input.inp-name { flex: 2; min-width: 110px; }
+  .producto-edit-row input.inp-price { width: 80px; }
+
+  .empty { text-align: center; color: var(--muted); padding: 30px; font-size: .9rem; }
+
+  /* TICKET MODAL */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: #000a; z-index: 200;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: var(--surface); border-radius: 14px; padding: 24px;
+    max-width: 340px; width: 90%; border: 1px solid var(--border);
+    text-align: center;
+  }
+  .modal h2 { font-size: 1.1rem; margin-bottom: 12px; }
+  .modal .ticket-items { text-align: left; background: var(--bg); border-radius: 8px; padding: 12px; margin: 12px 0; font-size: .85rem; }
+  .modal .ticket-items .ti { display: flex; justify-content: space-between; padding: 3px 0; }
+  .modal .ticket-total { font-size: 1.3rem; font-weight: 800; color: var(--accent); margin: 8px 0; }
+  .modal .ticket-cambio { font-size: 1.1rem; color: var(--green); font-weight: 700; margin-bottom: 12px; }
+  .modal .btn-cerrar {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 10px 30px; font-size: .9rem; font-weight: 700; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:1.6rem">🍺</span>
+      <div>
+        <h1>MICHELADAS POS</h1>
+        <div class="subtitle">Punto de Venta</div>
+      </div>
+    </div>
+  </div>
+  <div class="total-global">
+    <small>Ventas hoy</small>
+    <span id="ventasHoy">$0</span>
+  </div>
+</header>
+
+<nav>
+  <button class="active" onclick="goTab('venta')">🍺 Venta</button>
+  <button onclick="goTab('historial')">📋 Historial</button>
+  <button onclick="goTab('costos')">📊 Costos</button>
+  <button onclick="goTab('config')">⚙️ Config</button>
+</nav>
+
+<!-- VENTA -->
+<section id="tab-venta" class="active">
+  <div class="pedido-header">
+    <div>
+      <label>Mesa / Cliente</label>
+      <input type="text" id="mesaInput" placeholder="Mesa 1..." />
+    </div>
+  </div>
+
+  <div class="menu-grid" id="menuGrid"></div>
+
+  <div style="height:16px"></div>
+  <div class="items-list" id="itemsList"></div>
+
+  <div class="pedido-total" id="pedidoTotal" style="display:none">
+    <div class="row"><span>Subtotal</span><span id="ptSubtotal">$0</span></div>
+    <div class="row" style="padding-top:8px;border-top:1px solid var(--border);margin-top:4px;">
+      <span style="font-weight:700">TOTAL</span><span class="big" id="ptTotal">$0</span>
+    </div>
+  </div>
+
+  <div id="cobranzaSection" style="display:none">
+    <div class="efectivo-row">
+      <label>💵 Efectivo:</label>
+      <input type="number" id="efectivoInput" placeholder="0" oninput="calcCambio()" />
+    </div>
+    <div class="quick-cash" id="quickCash"></div>
+    <div class="pedido-total">
+      <div class="row"><span>Efectivo</span><span id="ptEfectivo">$0</span></div>
+      <div class="row"><span>Cambio</span><span class="cambio" id="ptCambio">$0</span></div>
+    </div>
+    <button class="btn-cobrar" id="btnCobrar" onclick="cobrar()">✅ COBRAR</button>
+    <button class="btn-limpiar" onclick="limpiarPedido()">🗑️ Cancelar pedido</button>
+  </div>
+  <div id="btnIniciarCobro" style="display:none">
+    <button class="btn-cobrar" onclick="iniciarCobro()">💵 Cobrar</button>
+    <button class="btn-limpiar" onclick="limpiarPedido()">🗑️ Cancelar pedido</button>
+  </div>
+</section>
+
+<!-- HISTORIAL -->
+<section id="tab-historial">
+  <div class="historial-summary">
+    <div class="stat-card"><div class="val" id="statPedidos">0</div><div class="lbl">Pedidos hoy</div></div>
+    <div class="stat-card"><div class="val" id="statVentas">$0</div><div class="lbl">Ventas hoy</div></div>
+    <div class="stat-card"><div class="val" id="statGanancia">$0</div><div class="lbl">Ganancia est.</div></div>
+    <div class="stat-card"><div class="val" id="statPromedio">$0</div><div class="lbl">Ticket prom.</div></div>
+  </div>
+  <div class="filter-bar">
+    <input type="date" id="filtroFecha" oninput="renderHistorial()" />
+    <button class="btn-export" onclick="exportarCSV()">📤 Exportar</button>
+  </div>
+  <div id="historialList"></div>
+</section>
+
+<!-- COSTOS -->
+<section id="tab-costos">
+  <div class="costos-grid" id="costosGrid"></div>
+</section>
+
+<!-- CONFIG -->
+<section id="tab-config">
+  <div class="config-section">
+    <h3>🍺 Productos del Menú</h3>
+    <div id="productosConfig"></div>
+    <div class="producto-edit-row" style="margin-top:12px">
+      <input class="inp-name" id="newProdName" placeholder="Nombre del producto" />
+      <input class="inp-price" id="newProdPrice" type="number" placeholder="Precio" />
+      <input class="inp-price" id="newProdCost" type="number" placeholder="Costo" />
+      <button class="btn-save" onclick="agregarProducto()">+ Agregar</button>
+    </div>
+  </div>
+  <div class="config-section">
+    <h3>💾 Datos</h3>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn-export" onclick="exportarDatos()">📤 Exportar JSON</button>
+      <label class="btn-export" style="cursor:pointer">
+        📥 Importar JSON
+        <input type="file" accept=".json" onchange="importarDatos(event)" style="display:none" />
+      </label>
+      <button style="background:none;border:1px solid var(--red);color:var(--red);border-radius:8px;padding:8px 14px;font-size:.8rem;cursor:pointer" onclick="borrarTodo()">🗑️ Borrar todo</button>
+    </div>
+  </div>
+</section>
+
+<!-- TICKET MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div style="font-size:2rem">✅</div>
+    <h2>¡Cobrado!</h2>
+    <div id="ticketContent"></div>
+    <button class="btn-cerrar" onclick="cerrarModal()">Listo</button>
+  </div>
+</div>
+
+<script>
+// ========== DATA ==========
+const EMOJIS = ['🍺','🍻','🌶️','🦐','🍋','🎉','🍹','🥤'];
+const DEFAULT_PRODUCTOS = [
+  { id:1, nombre:'Chelada',           precio:80,  costo:44.4, emoji:'🍺' },
+  { id:2, nombre:'Miche Clásica',     precio:110, costo:56.9, emoji:'🍻' },
+  { id:3, nombre:'Miche Tamarindo',   precio:120, costo:57.6, emoji:'🌶️' },
+  { id:4, nombre:'Micheron',          precio:130, costo:61.5, emoji:'🦐' },
+  { id:5, nombre:'Micheron c/Topín',  precio:145, costo:65.6, emoji:'🎉' },
+  { id:6, nombre:'Promo',             precio:260, costo:112,  emoji:'🍹' },
+];
+const COSTOS_DATA = [
+  { nombre:'Chelada', precio:80, costo:44.4, ganancia:35.6, insumos:[
+    {n:'Cerveza Indio 32oz',c:35},{n:'Cerveza Corona 710ml',c:31},{n:'Vaso 32oz',c:2.76},
+    {n:'Tapa 32oz',c:1},{n:'Limón',c:3}
+  ]},
+  { nombre:'Miche Clásica', precio:110, costo:56.9, ganancia:53.1, insumos:[
+    {n:'Cerveza Indio 32oz',c:35},{n:'Cerveza Corona 710ml',c:31},{n:'Salsas miche',c:2},
+    {n:'Vaso 44oz',c:3.52},{n:'Tapa 44oz',c:1.56},{n:'Escarchado',c:1},{n:'Limón',c:3}
+  ]},
+  { nombre:'Miche Tamarindo', precio:120, costo:57.6, ganancia:62.4, insumos:[
+    {n:'Cerveza Indio 32oz',c:35},{n:'Cerveza Corona 710ml',c:31},{n:'Salsas miche',c:2},
+    {n:'Vaso 32oz',c:2.76},{n:'Tapa 32oz',c:1},{n:'Escarchado',c:1},{n:'Limón',c:3},
+    {n:'Brocheta Tamarindo',c:1}
+  ]},
+  { nombre:'Micheron', precio:130, costo:61.5, ganancia:68.5, insumos:[
+    {n:'Cerveza Indio 32oz',c:35},{n:'Cerveza Corona 710ml',c:31},{n:'Clamato 1.89lt',c:2},
+    {n:'Salsas miche',c:2},{n:'Camarón',c:0.5},{n:'Vaso 44oz',c:3.52},{n:'Tapa 44oz',c:1.56},
+    {n:'Escarchado',c:1},{n:'Limón',c:3}
+  ]},
+  { nombre:'Micheron c/Topín', precio:145, costo:65.6, ganancia:79.4, insumos:[
+    {n:'Cerveza Indio 32oz',c:35},{n:'Cerveza Corona 710ml',c:31},{n:'Clamato 1.89lt',c:2},
+    {n:'Salsas miche',c:2},{n:'Camarón',c:0.5},{n:'Contenedor 1/4',c:1.8},{n:'Vaso 32oz',c:2.76},
+    {n:'Tapa 32oz',c:1},{n:'Escarchado',c:1},{n:'Limón',c:3},{n:'Cacahuate',c:1},
+    {n:'Pepino',c:1},{n:'Chamoy',c:1},{n:'Salsa Botanera',c:1}
+  ]},
+];
+
+let state = {
+  productos: JSON.parse(localStorage.getItem('mich_productos') || 'null') || DEFAULT_PRODUCTOS,
+  pedidos: JSON.parse(localStorage.getItem('mich_pedidos') || '[]'),
+  carrito: [],
+  efectivo: 0,
+};
+
+function save() {
+  localStorage.setItem('mich_productos', JSON.stringify(state.productos));
+  localStorage.setItem('mich_pedidos', JSON.stringify(state.pedidos));
+}
+
+// ========== TABS ==========
+function goTab(tab) {
+  document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  event.target.classList.add('active');
+  if (tab === 'historial') { setFechaHoy(); renderHistorial(); renderStats(); }
+  if (tab === 'costos') renderCostos();
+  if (tab === 'config') renderConfig();
+}
+
+// ========== MENÚ ==========
+function renderMenu() {
+  const g = document.getElementById('menuGrid');
+  g.innerHTML = state.productos.map(p => `
+    <div class="menu-card" onclick="addItem(${p.id})">
+      <span class="emoji">${p.emoji || '🍺'}</span>
+      <div class="name">${p.nombre}</div>
+      <div class="price">$${p.precio}</div>
+      <div class="profit">Ganancia: $${(p.precio - p.costo).toFixed(0)}</div>
+    </div>
+  `).join('');
+}
+
+// ========== CARRITO ==========
+function addItem(id) {
+  const prod = state.productos.find(p => p.id === id);
+  if (!prod) return;
+  const ex = state.carrito.find(i => i.id === id);
+  if (ex) ex.qty++;
+  else state.carrito.push({ id, nombre: prod.nombre, precio: prod.precio, costo: prod.costo, qty: 1 });
+  renderCarrito();
+}
+
+function changeQty(id, delta) {
+  const ex = state.carrito.find(i => i.id === id);
+  if (!ex) return;
+  ex.qty += delta;
+  if (ex.qty <= 0) state.carrito = state.carrito.filter(i => i.id !== id);
+  renderCarrito();
+}
+
+function getTotal() { return state.carrito.reduce((s, i) => s + i.precio * i.qty, 0); }
+
+function renderCarrito() {
+  const list = document.getElementById('itemsList');
+  const totalDiv = document.getElementById('pedidoTotal');
+  const cobranza = document.getElementById('cobranzaSection');
+  const btnIniciar = document.getElementById('btnIniciarCobro');
+
+  if (state.carrito.length === 0) {
+    list.innerHTML = '';
+    totalDiv.style.display = 'none';
+    cobranza.style.display = 'none';
+    btnIniciar.style.display = 'none';
+    document.getElementById('efectivoInput').value = '';
+    return;
+  }
+
+  const total = getTotal();
+  list.innerHTML = state.carrito.map(i => `
+    <div class="item-row">
+      <span class="item-name">${i.nombre}</span>
+      <div class="qty-ctrl">
+        <button class="qty-btn minus" onclick="changeQty(${i.id},-1)">−</button>
+        <span class="qty-num">${i.qty}</span>
+        <button class="qty-btn plus" onclick="changeQty(${i.id},1)">+</button>
+      </div>
+      <span class="item-price">$${(i.precio * i.qty).toFixed(0)}</span>
+    </div>
+  `).join('');
+
+  document.getElementById('ptSubtotal').textContent = '$' + total;
+  document.getElementById('ptTotal').textContent = '$' + total;
+  totalDiv.style.display = 'block';
+
+  if (cobranza.style.display === 'block') {
+    calcCambio();
+  } else {
+    btnIniciar.style.display = 'block';
+  }
+
+  // quick cash
+  const qc = document.getElementById('quickCash');
+  const opts = [50,100,200,500].filter(v => v >= total);
+  if (opts.length === 0) opts.push(500, 1000);
+  qc.innerHTML = opts.slice(0,4).map(v => `<button onclick="setEfectivo(${v})">$${v}</button>`).join('');
+}
+
+function setEfectivo(v) {
+  document.getElementById('efectivoInput').value = v;
+  calcCambio();
+}
+
+function calcCambio() {
+  const ef = parseFloat(document.getElementById('efectivoInput').value) || 0;
+  const total = getTotal();
+  const cambio = ef - total;
+  document.getElementById('ptEfectivo').textContent = '$' + ef;
+  document.getElementById('ptCambio').textContent = cambio >= 0 ? '$' + cambio : '--';
+  document.getElementById('btnCobrar').disabled = cambio < 0 || state.carrito.length === 0;
+}
+
+function iniciarCobro() {
+  document.getElementById('btnIniciarCobro').style.display = 'none';
+  document.getElementById('cobranzaSection').style.display = 'block';
+  calcCambio();
+  document.getElementById('efectivoInput').focus();
+}
+
+function cobrar() {
+  const ef = parseFloat(document.getElementById('efectivoInput').value) || 0;
+  const total = getTotal();
+  const cambio = ef - total;
+  if (cambio < 0) return;
+
+  const mesa = document.getElementById('mesaInput').value || 'Sin mesa';
+  const pedido = {
+    id: Date.now(),
+    mesa,
+    items: [...state.carrito],
+    total,
+    efectivo: ef,
+    cambio,
+    fecha: new Date().toISOString(),
+    estatus: 'cobrado'
+  };
+  state.pedidos.unshift(pedido);
+  save();
+
+  // Ticket
+  document.getElementById('ticketContent').innerHTML = `
+    <div class="ticket-items">
+      ${pedido.items.map(i => `<div class="ti"><span>${i.nombre} x${i.qty}</span><span>$${i.precio * i.qty}</span></div>`).join('')}
+    </div>
+    <div class="ticket-total">Total: $${total}</div>
+    <div class="ticket-cambio">Cambio: $${cambio}</div>
+    <div style="font-size:.75rem;color:var(--muted)">${mesa} · ${new Date().toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'})}</div>
+  `;
+  document.getElementById('modalOverlay').classList.add('show');
+  updateVentasHoy();
+  limpiarPedido(true);
+}
+
+function cerrarModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+
+function limpiarPedido(keepMesa) {
+  state.carrito = [];
+  document.getElementById('efectivoInput').value = '';
+  document.getElementById('cobranzaSection').style.display = 'none';
+  document.getElementById('btnIniciarCobro').style.display = 'none';
+  if (!keepMesa) document.getElementById('mesaInput').value = '';
+  renderCarrito();
+}
+
+// ========== HISTORIAL ==========
+function setFechaHoy() {
+  const hoy = new Date().toISOString().slice(0, 10);
+  document.getElementById('filtroFecha').value = hoy;
+}
+
+function pedidosDelDia() {
+  const fecha = document.getElementById('filtroFecha')?.value || new Date().toISOString().slice(0, 10);
+  return state.pedidos.filter(p => p.fecha.startsWith(fecha) && p.estatus !== 'anulado');
+}
+
+function renderStats() {
+  const lista = pedidosDelDia();
+  const total = lista.reduce((s, p) => s + p.total, 0);
+  const ganancia = lista.reduce((s, p) => s + p.items.reduce((ss, i) => ss + (i.precio - (i.costo || 0)) * i.qty, 0), 0);
+  document.getElementById('statPedidos').textContent = lista.length;
+  document.getElementById('statVentas').textContent = '$' + total;
+  document.getElementById('statGanancia').textContent = '$' + ganancia.toFixed(0);
+  document.getElementById('statPromedio').textContent = lista.length ? '$' + (total / lista.length).toFixed(0) : '$0';
+}
+
+function renderHistorial() {
+  renderStats();
+  const lista = state.pedidos.filter(p => {
+    const fecha = document.getElementById('filtroFecha')?.value;
+    if (fecha && !p.fecha.startsWith(fecha)) return false;
+    return true;
+  });
+
+  const el = document.getElementById('historialList');
+  if (lista.length === 0) { el.innerHTML = '<div class="empty">Sin pedidos en esta fecha</div>'; return; }
+
+  el.innerHTML = lista.map(p => `
+    <div class="pedido-card">
+      <div class="top">
+        <span class="mesa">${p.mesa}</span>
+        <span class="hora">${new Date(p.fecha).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</span>
+      </div>
+      <div class="items-summary">${p.items.map(i => `${i.nombre} x${i.qty}`).join(' · ')}</div>
+      <div class="bottom">
+        <span class="total-p">$${p.total}</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="badge ${p.estatus === 'cobrado' ? 'cobrado' : 'anulado'}">${p.estatus === 'cobrado' ? '✓ Cobrado' : '✗ Anulado'}</span>
+          ${p.estatus === 'cobrado' ? `<button class="btn-void" onclick="anularPedido(${p.id})">Anular</button>` : ''}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function anularPedido(id) {
+  if (!confirm('¿Anular este pedido?')) return;
+  const p = state.pedidos.find(x => x.id === id);
+  if (p) p.estatus = 'anulado';
+  save();
+  renderHistorial();
+  updateVentasHoy();
+}
+
+function updateVentasHoy() {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const total = state.pedidos.filter(p => p.fecha.startsWith(hoy) && p.estatus !== 'anulado').reduce((s, p) => s + p.total, 0);
+  document.getElementById('ventasHoy').textContent = '$' + total;
+}
+
+// ========== COSTOS ==========
+function renderCostos() {
+  const all = [...COSTOS_DATA];
+  // Añadir productos custom sin costo definido
+  state.productos.filter(p => !COSTOS_DATA.find(c => c.nombre === p.nombre)).forEach(p => {
+    all.push({ nombre: p.nombre, precio: p.precio, costo: p.costo, ganancia: p.precio - p.costo, insumos: [] });
+  });
+
+  document.getElementById('costosGrid').innerHTML = all.map(c => `
+    <div class="costo-card">
+      <div class="costo-header">
+        <span class="cname">${c.nombre}</span>
+        <span class="cprice">$${c.precio}</span>
+      </div>
+      <div class="costo-body">
+        ${c.insumos.length > 0 ? c.insumos.map(i => `
+          <div class="costo-row">
+            <span class="cr-label">${i.n}</span>
+            <span>$${i.c.toFixed(1)}</span>
+          </div>
+        `).join('') : '<div style="font-size:.75rem;color:var(--muted);padding:6px 0">Sin detalle de insumos</div>'}
+        <div class="costo-totals">
+          <div class="ctr"><span>Costo total</span><span>$${c.costo.toFixed(1)}</span></div>
+          <div class="ctr"><span>Venta</span><span>$${c.precio}</span></div>
+          <div class="ctr ganancia"><span>Ganancia</span><span>$${c.ganancia.toFixed(1)}</span></div>
+          <div class="ctr" style="color:var(--accent);font-size:.75rem"><span>Margen</span><span>${((c.ganancia/c.precio)*100).toFixed(0)}%</span></div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ========== CONFIG ==========
+function renderConfig() {
+  document.getElementById('productosConfig').innerHTML = state.productos.map((p, i) => `
+    <div class="producto-edit-row">
+      <input class="inp-name" value="${p.nombre}" onchange="editProd(${i},'nombre',this.value)" />
+      <input class="inp-price" type="number" value="${p.precio}" onchange="editProd(${i},'precio',+this.value)" placeholder="Precio" />
+      <input class="inp-price" type="number" value="${p.costo}" onchange="editProd(${i},'costo',+this.value)" placeholder="Costo" />
+      <button class="btn-delete" onclick="deleteProd(${i})">✕</button>
+    </div>
+  `).join('');
+}
+
+function editProd(i, key, val) {
+  state.productos[i][key] = val;
+  save(); renderMenu();
+}
+
+function deleteProd(i) {
+  if (!confirm('¿Eliminar este producto?')) return;
+  state.productos.splice(i, 1);
+  save(); renderMenu(); renderConfig();
+}
+
+function agregarProducto() {
+  const nombre = document.getElementById('newProdName').value.trim();
+  const precio = parseFloat(document.getElementById('newProdPrice').value) || 0;
+  const costo = parseFloat(document.getElementById('newProdCost').value) || 0;
+  if (!nombre || !precio) { alert('Nombre y precio son requeridos'); return; }
+  const emoji = EMOJIS[state.productos.length % EMOJIS.length];
+  state.productos.push({ id: Date.now(), nombre, precio, costo, emoji });
+  document.getElementById('newProdName').value = '';
+  document.getElementById('newProdPrice').value = '';
+  document.getElementById('newProdCost').value = '';
+  save(); renderMenu(); renderConfig();
+}
+
+// ========== EXPORT / IMPORT ==========
+function exportarCSV() {
+  const fecha = document.getElementById('filtroFecha').value;
+  const lista = state.pedidos.filter(p => !fecha || p.fecha.startsWith(fecha));
+  const rows = [['Fecha','Hora','Mesa','Productos','Total','Efectivo','Cambio','Estatus']];
+  lista.forEach(p => {
+    rows.push([
+      p.fecha.slice(0,10),
+      new Date(p.fecha).toLocaleTimeString('es-MX'),
+      p.mesa,
+      p.items.map(i => `${i.nombre}x${i.qty}`).join('; '),
+      p.total, p.efectivo, p.cambio, p.estatus
+    ]);
+  });
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'micheladas_' + (fecha || 'todo') + '.csv';
+  a.click();
+}
+
+function exportarDatos() {
+  const blob = new Blob([JSON.stringify({ productos: state.productos, pedidos: state.pedidos }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'micheladas_backup_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+}
+
+function importarDatos(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (data.productos) state.productos = data.productos;
+      if (data.pedidos) state.pedidos = data.pedidos;
+      save(); renderMenu(); renderConfig(); updateVentasHoy();
+      alert('Datos importados correctamente');
+    } catch { alert('Error al leer el archivo'); }
+  };
+  reader.readAsText(f);
+}
+
+function borrarTodo() {
+  if (!confirm('¿Borrar TODOS los pedidos? Esto no se puede deshacer.')) return;
+  state.pedidos = [];
+  save(); updateVentasHoy();
+  alert('Pedidos eliminados');
+}
+
+// ========== INIT ==========
+renderMenu();
+updateVentasHoy();
+</script>
+</body>
+</html>

@@ -285,16 +285,34 @@
   </div>
 
   <div id="cobranzaSection" style="display:none">
-    <div class="efectivo-row">
-      <label>💵 Efectivo:</label>
-      <input type="number" id="efectivoInput" placeholder="0" oninput="calcCambio()" />
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <button id="btnModoEfectivo" onclick="setModo('efectivo')" style="flex:1;padding:10px;border-radius:8px;border:2px solid var(--accent);background:var(--accent);color:#fff;font-weight:700;font-size:.9rem;cursor:pointer">💵 Efectivo</button>
+      <button id="btnModoTransferencia" onclick="setModo('transferencia')" style="flex:1;padding:10px;border-radius:8px;border:2px solid var(--border);background:var(--card);color:var(--muted);font-weight:700;font-size:.9rem;cursor:pointer">📲 Transferencia</button>
     </div>
-    <div class="quick-cash" id="quickCash"></div>
-    <div class="pedido-total">
-      <div class="row"><span>Total a cobrar</span><span id="ptEfectivo" style="font-weight:700;color:var(--text)">$0</span></div>
-      <div class="row" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
-        <span style="font-size:1rem;font-weight:700">💰 Cambio</span>
-        <span class="cambio" id="ptCambio" style="font-size:1.2rem;font-weight:800">$0</span>
+    <div id="seccionEfectivo">
+      <div class="efectivo-row">
+        <label>💵 Efectivo:</label>
+        <input type="number" id="efectivoInput" placeholder="0" oninput="calcCambio()" />
+      </div>
+      <div class="quick-cash" id="quickCash"></div>
+      <div class="pedido-total">
+        <div class="row"><span>Total a cobrar</span><span id="ptEfectivo" style="font-weight:700;color:var(--text)">$0</span></div>
+        <div class="row" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
+          <span style="font-size:1rem;font-weight:700">💰 Cambio</span>
+          <span class="cambio" id="ptCambio" style="font-size:1.2rem;font-weight:800">$0</span>
+        </div>
+      </div>
+    </div>
+    <div id="seccionTransferencia" style="display:none">
+      <div class="pedido-total">
+        <div class="row"><span>Total a transferir</span><span style="font-weight:800;font-size:1.2rem;color:var(--accent)" id="ptTransferencia">$0</span></div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;margin-bottom:12px">
+        <div style="font-size:.75rem;color:var(--muted);margin-bottom:4px">Transferencia confirmada</div>
+        <label style="display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer">
+          <input type="checkbox" id="chkTransferencia" onchange="calcCambio()" style="width:20px;height:20px;accent-color:var(--green)">
+          <span style="font-size:.95rem;font-weight:700">Marcar como recibida</span>
+        </label>
       </div>
     </div>
     <button class="btn-cobrar" id="btnCobrar" onclick="cobrar()">✅ COBRAR</button>
@@ -518,51 +536,87 @@ function setEfectivo(v) {
   calcCambio();
 }
 
+let modoPago = 'efectivo';
+
+function setModo(modo) {
+  modoPago = modo;
+  const esEfectivo = modo === 'efectivo';
+  document.getElementById('seccionEfectivo').style.display = esEfectivo ? 'block' : 'none';
+  document.getElementById('seccionTransferencia').style.display = esEfectivo ? 'none' : 'block';
+  document.getElementById('btnModoEfectivo').style.cssText = esEfectivo
+    ? 'flex:1;padding:10px;border-radius:8px;border:2px solid var(--accent);background:var(--accent);color:#fff;font-weight:700;font-size:.9rem;cursor:pointer'
+    : 'flex:1;padding:10px;border-radius:8px;border:2px solid var(--border);background:var(--card);color:var(--muted);font-weight:700;font-size:.9rem;cursor:pointer';
+  document.getElementById('btnModoTransferencia').style.cssText = !esEfectivo
+    ? 'flex:1;padding:10px;border-radius:8px;border:2px solid var(--green);background:var(--green);color:#fff;font-weight:700;font-size:.9rem;cursor:pointer'
+    : 'flex:1;padding:10px;border-radius:8px;border:2px solid var(--border);background:var(--card);color:var(--muted);font-weight:700;font-size:.9rem;cursor:pointer';
+  if (!esEfectivo) {
+    const total = getTotal();
+    document.getElementById('ptTransferencia').textContent = '$' + total;
+    document.getElementById('chkTransferencia').checked = false;
+  }
+  calcCambio();
+}
+
 function calcCambio() {
-  const ef = parseFloat(document.getElementById('efectivoInput').value) || 0;
   const total = getTotal();
-  const cambio = ef - total;
-  document.getElementById('ptEfectivo').textContent = '$' + total;
-  document.getElementById('ptCambio').textContent = cambio >= 0 ? '$' + cambio : '--';
-  document.getElementById('ptCambio').style.color = cambio >= 0 ? 'var(--green)' : 'var(--red)';
-  document.getElementById('btnCobrar').disabled = cambio < 0 || state.carrito.length === 0;
+  if (modoPago === 'efectivo') {
+    const ef = parseFloat(document.getElementById('efectivoInput').value) || 0;
+    const cambio = ef - total;
+    document.getElementById('ptEfectivo').textContent = '$' + total;
+    document.getElementById('ptCambio').textContent = cambio >= 0 ? '$' + cambio : '--';
+    document.getElementById('ptCambio').style.color = cambio >= 0 ? 'var(--green)' : 'var(--red)';
+    document.getElementById('btnCobrar').disabled = cambio < 0 || state.carrito.length === 0;
+  } else {
+    const confirmada = document.getElementById('chkTransferencia').checked;
+    document.getElementById('ptTransferencia').textContent = '$' + total;
+    document.getElementById('btnCobrar').disabled = !confirmada || state.carrito.length === 0;
+  }
 }
 
 function iniciarCobro() {
   document.getElementById('btnIniciarCobro').style.display = 'none';
   document.getElementById('cobranzaSection').style.display = 'block';
-  calcCambio();
+  setModo('efectivo');
   document.getElementById('efectivoInput').focus();
 }
 
 function cobrar() {
-  const ef = parseFloat(document.getElementById('efectivoInput').value) || 0;
   const total = getTotal();
-  const cambio = ef - total;
-  if (cambio < 0) return;
-
   const mesa = document.getElementById('mesaInput').value || 'Sin mesa';
+  let ef = 0, cambio = 0;
+
+  if (modoPago === 'efectivo') {
+    ef = parseFloat(document.getElementById('efectivoInput').value) || 0;
+    cambio = ef - total;
+    if (cambio < 0) return;
+  }
+
   const pedido = {
     id: Date.now(),
     mesa,
     items: [...state.carrito],
     total,
-    efectivo: ef,
-    cambio,
+    efectivo: modoPago === 'efectivo' ? ef : 0,
+    cambio: modoPago === 'efectivo' ? cambio : 0,
+    modoPago,
     fecha: new Date().toISOString(),
     estatus: 'cobrado'
   };
   state.pedidos.unshift(pedido);
   save();
 
-  // Ticket
+  const iconoPago = modoPago === 'efectivo' ? '💵' : '📲';
+  const infoCambio = modoPago === 'efectivo'
+    ? `<div class="ticket-cambio">Cambio: $${cambio}</div>`
+    : `<div style="color:var(--green);font-weight:700;margin-bottom:8px">📲 Transferencia recibida</div>`;
+
   document.getElementById('ticketContent').innerHTML = `
     <div class="ticket-items">
       ${pedido.items.map(i => `<div class="ti"><span>${i.nombre} x${i.qty}</span><span>$${i.precio * i.qty}</span></div>`).join('')}
     </div>
     <div class="ticket-total">Total: $${total}</div>
-    <div class="ticket-cambio">Cambio: $${cambio}</div>
-    <div style="font-size:.75rem;color:var(--muted)">${mesa} · ${new Date().toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'})}</div>
+    ${infoCambio}
+    <div style="font-size:.75rem;color:var(--muted)">${mesa} · ${iconoPago} ${modoPago} · ${new Date().toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'})}</div>
   `;
   document.getElementById('modalOverlay').classList.add('show');
   updateVentasHoy();
@@ -575,7 +629,9 @@ function cerrarModal() {
 
 function limpiarPedido(keepMesa) {
   state.carrito = [];
+  modoPago = 'efectivo';
   document.getElementById('efectivoInput').value = '';
+  if (document.getElementById('chkTransferencia')) document.getElementById('chkTransferencia').checked = false;
   document.getElementById('cobranzaSection').style.display = 'none';
   document.getElementById('btnIniciarCobro').style.display = 'none';
   if (!keepMesa) document.getElementById('mesaInput').value = '';
@@ -624,6 +680,7 @@ function renderHistorial() {
       <div class="bottom">
         <span class="total-p">$${p.total}</span>
         <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:.75rem;color:var(--muted)">${p.modoPago === 'transferencia' ? '📲' : '💵'}</span>
           <span class="badge ${p.estatus === 'cobrado' ? 'cobrado' : 'anulado'}">${p.estatus === 'cobrado' ? '✓ Cobrado' : '✗ Anulado'}</span>
           ${p.estatus === 'cobrado' ? `<button class="btn-void" onclick="anularPedido(${p.id})">Anular</button>` : ''}
         </div>

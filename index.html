@@ -259,6 +259,7 @@
 <nav>
   <button class="active" onclick="goTab('venta')">🍺 Venta</button>
   <button onclick="goTab('historial')">📋 Historial</button>
+  <button onclick="goTab('gastos')">💸 Gastos</button>
   <button onclick="goTab('costos')">📊 Costos</button>
   <button onclick="goTab('config')">⚙️ Config</button>
 </nav>
@@ -339,6 +340,29 @@
   <div id="historialList"></div>
 </section>
 
+<!-- GASTOS -->
+<section id="tab-gastos">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+    <div style="font-size:.95rem;font-weight:700">💸 Gastos e Insumos Extra</div>
+    <div style="font-size:.8rem;color:var(--muted)">Se descuentan de la ganancia del día</div>
+  </div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <input id="gastoDesc" placeholder="Descripción (ej. Hielo, Limones...)" style="flex:2;min-width:140px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 10px;font-size:.9rem" />
+      <input id="gastoMonto" type="number" placeholder="Monto $" style="width:100px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 10px;font-size:.9rem" />
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <select id="gastoTipo" style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 10px;font-size:.85rem">
+        <option value="gasto">💸 Gasto / Insumo</option>
+        <option value="perdida">📉 Pérdida (mala entrega, etc.)</option>
+      </select>
+    </div>
+    <button class="btn-save" style="width:100%" onclick="agregarGasto()">+ Registrar</button>
+  </div>
+  <div id="gastosList"></div>
+  <div id="gastosTotales" style="margin-top:12px"></div>
+</section>
+
 <!-- COSTOS -->
 <section id="tab-costos">
   <div class="costos-grid" id="costosGrid"></div>
@@ -357,7 +381,24 @@
     </div>
   </div>
   <div class="config-section">
-    <h3>💾 Datos</h3>
+    <h3>☁️ Respaldo en la Nube (JSONBin)</h3>
+    <div class="config-row">
+      <label>BIN ID</label>
+      <input type="text" id="cfgBinId" placeholder="6a374033da38..." />
+    </div>
+    <div class="config-row">
+      <label>Access Key</label>
+      <input type="password" id="cfgApiKey" placeholder="$2a$10$..." />
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <button class="btn-save" onclick="guardarCredenciales()">💾 Guardar claves</button>
+      <button class="btn-export" onclick="subirNube()">☁️ Subir ahora</button>
+      <button class="btn-export" onclick="descargarNube()">⬇️ Restaurar nube</button>
+    </div>
+    <div id="nubeStatus" style="font-size:.75rem;color:var(--muted);margin-top:8px"></div>
+  </div>
+  <div class="config-section">
+    <h3>💾 Datos locales</h3>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn-export" onclick="exportarDatos()">📤 Exportar JSON</button>
       <label class="btn-export" style="cursor:pointer">
@@ -420,13 +461,18 @@ const COSTOS_DATA = [
 let state = {
   productos: JSON.parse(localStorage.getItem('mich_productos') || 'null') || DEFAULT_PRODUCTOS,
   pedidos: JSON.parse(localStorage.getItem('mich_pedidos') || '[]'),
+  gastos: JSON.parse(localStorage.getItem('mich_gastos') || '[]'),
   carrito: [],
   efectivo: 0,
 };
 
+const JSONBIN_BIN = localStorage.getItem('mich_bin_id') || '6a374033da38895dfee51336';
+const JSONBIN_KEY = localStorage.getItem('mich_api_key') || '$2a$10$9VfaQRuaCX9fyS6yiO1dhuh5DeDt89523dzWLH/.6jPYvy3wOcPv.';
+
 function save() {
   localStorage.setItem('mich_productos', JSON.stringify(state.productos));
   localStorage.setItem('mich_pedidos', JSON.stringify(state.pedidos));
+  localStorage.setItem('mich_gastos', JSON.stringify(state.gastos));
 }
 
 // ========== TABS ==========
@@ -436,8 +482,9 @@ function goTab(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
   event.target.classList.add('active');
   if (tab === 'historial') { setFechaHoy(); renderHistorial(); renderStats(); }
+  if (tab === 'gastos') renderGastos();
   if (tab === 'costos') renderCostos();
-  if (tab === 'config') renderConfig();
+  if (tab === 'config') { renderConfig(); cargarCredencialesUI(); }
 }
 
 // ========== MENÚ ==========
@@ -650,12 +697,16 @@ function pedidosDelDia() {
 }
 
 function renderStats() {
+  const fecha = document.getElementById('filtroFecha')?.value || new Date().toISOString().slice(0,10);
   const lista = pedidosDelDia();
   const total = lista.reduce((s, p) => s + p.total, 0);
   const ganancia = lista.reduce((s, p) => s + p.items.reduce((ss, i) => ss + (i.precio - (i.costo || 0)) * i.qty, 0), 0);
+  const gastosDelDia = state.gastos.filter(g => g.fecha.startsWith(fecha)).reduce((s, g) => s + g.monto, 0);
+  const neta = ganancia - gastosDelDia;
   document.getElementById('statPedidos').textContent = lista.length;
   document.getElementById('statVentas').textContent = '$' + total;
-  document.getElementById('statGanancia').textContent = '$' + ganancia.toFixed(0);
+  document.getElementById('statGanancia').textContent = (neta >= 0 ? '$' : '-$') + Math.abs(neta).toFixed(0);
+  document.getElementById('statGanancia').style.color = neta >= 0 ? 'var(--accent)' : 'var(--red)';
   document.getElementById('statPromedio').textContent = lista.length ? '$' + (total / lista.length).toFixed(0) : '$0';
 }
 
@@ -794,10 +845,10 @@ function exportarCSV() {
 }
 
 function exportarDatos() {
-  const blob = new Blob([JSON.stringify({ productos: state.productos, pedidos: state.pedidos }, null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify({ productos: state.productos, pedidos: state.pedidos, gastos: state.gastos }, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'micheladas_backup_' + new Date().toISOString().slice(0,10) + '.json';
+  a.download = 'taberna_backup_' + new Date().toISOString().slice(0,10) + '.json';
   a.click();
 }
 
@@ -810,6 +861,7 @@ function importarDatos(e) {
       const data = JSON.parse(ev.target.result);
       if (data.productos) state.productos = data.productos;
       if (data.pedidos) state.pedidos = data.pedidos;
+      if (data.gastos) state.gastos = data.gastos;
       save(); renderMenu(); renderConfig(); updateVentasHoy();
       alert('Datos importados correctamente');
     } catch { alert('Error al leer el archivo'); }
@@ -822,6 +874,123 @@ function borrarTodo() {
   state.pedidos = [];
   save(); updateVentasHoy();
   alert('Pedidos eliminados');
+}
+
+// ========== GASTOS ==========
+function agregarGasto() {
+  const desc = document.getElementById('gastoDesc').value.trim();
+  const monto = parseFloat(document.getElementById('gastoMonto').value) || 0;
+  const tipo = document.getElementById('gastoTipo').value;
+  if (!desc || !monto) { alert('Descripción y monto requeridos'); return; }
+  state.gastos.unshift({ id: Date.now(), desc, monto, tipo, fecha: new Date().toISOString() });
+  document.getElementById('gastoDesc').value = '';
+  document.getElementById('gastoMonto').value = '';
+  save();
+  renderGastos();
+}
+
+function eliminarGasto(id) {
+  if (!confirm('¿Eliminar este registro?')) return;
+  state.gastos = state.gastos.filter(g => g.id !== id);
+  save(); renderGastos();
+}
+
+function renderGastos() {
+  const hoy = new Date().toISOString().slice(0,10);
+  const gastosHoy = state.gastos.filter(g => g.fecha.startsWith(hoy));
+  const totalGastos = gastosHoy.reduce((s,g) => s + g.monto, 0);
+
+  const el = document.getElementById('gastosList');
+  if (state.gastos.length === 0) { el.innerHTML = '<div class="empty">Sin gastos registrados</div>'; }
+  else {
+    el.innerHTML = state.gastos.map(g => `
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div>
+          <div style="font-weight:700;font-size:.9rem">${g.tipo === 'perdida' ? '📉' : '💸'} ${g.desc}</div>
+          <div style="font-size:.72rem;color:var(--muted)">${new Date(g.fecha).toLocaleDateString('es-MX')} · ${g.tipo === 'perdida' ? 'Pérdida' : 'Gasto'}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="color:var(--red);font-weight:800;font-size:1rem">-$${g.monto.toFixed(0)}</span>
+          <button class="btn-void" onclick="eliminarGasto(${g.id})">✕</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('gastosTotales').innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px">
+      <div style="display:flex;justify-content:space-between;font-size:.85rem;padding:4px 0">
+        <span>Total gastos hoy</span><span style="color:var(--red);font-weight:700">-$${totalGastos.toFixed(0)}</span>
+      </div>
+    </div>
+  `;
+}
+
+// ========== JSONBIN NUBE ==========
+function getBinCreds() {
+  return {
+    binId: localStorage.getItem('mich_bin_id') || JSONBIN_BIN,
+    apiKey: localStorage.getItem('mich_api_key') || JSONBIN_KEY,
+  };
+}
+
+function setNubeStatus(msg, color='var(--muted)') {
+  const el = document.getElementById('nubeStatus');
+  if (el) { el.textContent = msg; el.style.color = color; }
+}
+
+async function subirNube() {
+  const { binId, apiKey } = getBinCreds();
+  if (!binId || !apiKey) { alert('Configura el BIN ID y Access Key primero'); return; }
+  setNubeStatus('Subiendo...', 'var(--accent)');
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Master-Key': apiKey },
+      body: JSON.stringify({ pedidos: state.pedidos, gastos: state.gastos, productos: state.productos })
+    });
+    if (!res.ok) throw new Error('Error ' + res.status);
+    setNubeStatus('✅ Subido ' + new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}), 'var(--green)');
+  } catch(e) { setNubeStatus('❌ Error al subir: ' + e.message, 'var(--red)'); }
+}
+
+async function descargarNube() {
+  const { binId, apiKey } = getBinCreds();
+  if (!binId || !apiKey) { alert('Configura el BIN ID y Access Key primero'); return; }
+  if (!confirm('¿Restaurar datos desde la nube? Se sobreescribirán los datos locales.')) return;
+  setNubeStatus('Descargando...', 'var(--accent)');
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`, {
+      headers: { 'X-Master-Key': apiKey }
+    });
+    if (!res.ok) throw new Error('Error ' + res.status);
+    const data = await res.json();
+    const record = data.record;
+    if (record.pedidos) state.pedidos = record.pedidos;
+    if (record.gastos) state.gastos = record.gastos;
+    if (record.productos) state.productos = record.productos;
+    save(); renderMenu(); updateVentasHoy();
+    setNubeStatus('✅ Restaurado ' + new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}), 'var(--green)');
+    alert('Datos restaurados desde la nube');
+  } catch(e) { setNubeStatus('❌ Error al descargar: ' + e.message, 'var(--red)'); }
+}
+
+function guardarCredenciales() {
+  const binId = document.getElementById('cfgBinId').value.trim();
+  const apiKey = document.getElementById('cfgApiKey').value.trim();
+  if (!binId || !apiKey) { alert('Completa ambos campos'); return; }
+  localStorage.setItem('mich_bin_id', binId);
+  localStorage.setItem('mich_api_key', apiKey);
+  setNubeStatus('✅ Claves guardadas', 'var(--green)');
+}
+
+function cargarCredencialesUI() {
+  const binId = localStorage.getItem('mich_bin_id') || JSONBIN_BIN;
+  const apiKey = localStorage.getItem('mich_api_key') || JSONBIN_KEY;
+  const b = document.getElementById('cfgBinId');
+  const k = document.getElementById('cfgApiKey');
+  if (b) b.value = binId;
+  if (k) k.value = apiKey;
 }
 
 // ========== INIT ==========
